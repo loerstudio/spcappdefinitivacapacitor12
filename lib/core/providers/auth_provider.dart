@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
-import '../services/auth_service.dart';
+import '../services/supabase_service.dart';
 import '../services/storage_service.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -14,10 +15,10 @@ class AuthProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _currentUser != null;
   bool get isInitialized => _isInitialized;
-  bool get isTrainer => _currentUser?.isTrainer ?? false;
-  bool get isClient => _currentUser?.isClient ?? false;
+  bool get isTrainer => _currentUser?.role == UserRole.trainer;
+  bool get isClient => _currentUser?.role == UserRole.client;
 
-  final AuthService _authService = AuthService();
+  final SupabaseService _supabaseService = SupabaseService();
 
   AuthProvider() {
     _initialize();
@@ -26,157 +27,169 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _initialize() async {
     _setLoading(true);
     try {
-      final savedUser = await StorageService.getUser();
-      if (savedUser != null) {
-        _currentUser = savedUser;
-        // Verify token is still valid
-        final isValid = await _authService.verifyToken();
-        if (!isValid) {
-          await logout();
-        }
+      // Initialize Supabase
+      await SupabaseService.initialize();
+
+      // Check if there's a current user
+      final user = _supabaseService.currentUser;
+      if (user != null) {
+        await _loadUserFromSupabase(user);
       }
-    } catch (e) {
-      debugPrint('Error initializing auth: $e');
-    } finally {
+
+      // Listen to auth state changes
+      _supabaseService.authStateChanges.listen((AuthState data) {
+        if (data.event == AuthChangeEvent.signedIn && data.session?.user != null) {
+          _loadUserFromSupabase(data.session!.user);
+        } else if (data.event == AuthChangeEvent.signedOut) {
+          _currentUser = null;
+          notifyListeners();
+        }
+      });
+
       _isInitialized = true;
+    } catch (e) {
+      _setError('Failed to initialize authentication: $e');
+    } finally {
       _setLoading(false);
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<void> _loadUserFromSupabase(User user) async {
+    try {
+      // Create user model from Supabase user
+      final userName = user.userMetadata?['name'] ?? user.email ?? '';
+      final nameParts = userName.split(' ');
+      
+      _currentUser = UserModel(
+        id: user.id,
+        email: user.email ?? '',
+        name: nameParts.first,
+        surname: nameParts.skip(1).join(' '),
+        role: UserRole.client, // Default
+        createdAt: DateTime.parse(user.createdAt),
+        isActive: true,
+        profileImageUrl: null, // Will be loaded separately if needed
+      );
+      
+      notifyListeners();
+    } catch (e) {
+      _setError('Failed to load user data: $e');
+    }
+  }
+
+  // Alias for login method
+  Future<bool> login({
+    required String email,
+    required String password,
+  }) async {
+    return await signInWithEmailAndPassword(email: email, password: password);
+  }
+
+  Future<bool> signInWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) async {
     _setLoading(true);
     _clearError();
 
     try {
-      final user = await _authService.login(email, password);
+      final response = await _supabaseService.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = response.user;
       if (user != null) {
-        _currentUser = user;
-        await StorageService.saveUser(user);
-        notifyListeners();
+        await _loadUserFromSupabase(user);
+        await StorageService.setString('user_email', email);
         return true;
-      } else {
-        _setError('Credenziali non valide');
-        return false;
       }
+      return false;
     } catch (e) {
-      _setError('Errore durante il login: ${e.toString()}');
+      _setError(e.toString());
       return false;
     } finally {
       _setLoading(false);
     }
   }
 
+  // Alias for register method
   Future<bool> register({
     required String email,
     required String password,
-    required String name,
-    String? surname,
-    String? phone,
-    required UserRole role,
+    required String firstName,
+    required String lastName,
+    required bool isTrainer,
+  }) async {
+    return await signUpWithEmailAndPassword(
+      email: email,
+      password: password,
+      firstName: firstName,
+      lastName: lastName,
+      isTrainer: isTrainer,
+    );
+  }
+
+  Future<bool> signUpWithEmailAndPassword({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required bool isTrainer,
   }) async {
     _setLoading(true);
     _clearError();
 
     try {
-      final user = await _authService.register(
+      final response = await _supabaseService.createUserWithEmailAndPassword(
         email: email,
         password: password,
-        name: name,
-        surname: surname,
-        phone: phone,
-        role: role,
+        name: '$firstName $lastName',
       );
-      
-      if (user != null) {
-        _currentUser = user;
-        await StorageService.saveUser(user);
-        notifyListeners();
+
+      final currentUser = response.user;
+      if (currentUser != null) {
+        await _loadUserFromSupabase(currentUser);
+        await StorageService.setString('user_email', email);
         return true;
-      } else {
-        _setError('Errore durante la registrazione');
-        return false;
       }
+      return false;
     } catch (e) {
-      _setError('Errore durante la registrazione: ${e.toString()}');
+      _setError(e.toString());
       return false;
     } finally {
       _setLoading(false);
     }
   }
 
+  // Alias for logout method
   Future<void> logout() async {
+    return await signOut();
+  }
+
+  Future<void> signOut() async {
     _setLoading(true);
     try {
-      await _authService.logout();
-      await StorageService.clearUser();
+      await _supabaseService.signOut();
       _currentUser = null;
+      await StorageService.remove('user_email');
       notifyListeners();
     } catch (e) {
-      debugPrint('Error during logout: $e');
+      _setError('Failed to sign out: $e');
     } finally {
       _setLoading(false);
     }
   }
 
-  Future<bool> updateProfile({
-    String? name,
-    String? surname,
-    String? phone,
-    String? bio,
-    List<String>? specializations,
-    double? weight,
-    double? height,
-    int? age,
-    String? fitnessGoal,
-  }) async {
-    if (_currentUser == null) return false;
-
+  Future<bool> sendPasswordResetEmail(String email) async {
     _setLoading(true);
     _clearError();
 
     try {
-      final updatedUser = await _authService.updateProfile(
-        userId: _currentUser!.id,
-        name: name,
-        surname: surname,
-        phone: phone,
-        bio: bio,
-        specializations: specializations,
-        weight: weight,
-        height: height,
-        age: age,
-        fitnessGoal: fitnessGoal,
-      );
-
-      if (updatedUser != null) {
-        _currentUser = updatedUser;
-        await StorageService.saveUser(updatedUser);
-        notifyListeners();
-        return true;
-      } else {
-        _setError('Errore durante l\'aggiornamento del profilo');
-        return false;
-      }
+      await _supabaseService.sendPasswordResetEmail(email);
+      return true;
     } catch (e) {
-      _setError('Errore durante l\'aggiornamento: ${e.toString()}');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  Future<bool> resetPassword(String email) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      final success = await _authService.resetPassword(email);
-      if (!success) {
-        _setError('Errore durante il reset della password');
-      }
-      return success;
-    } catch (e) {
-      _setError('Errore durante il reset: ${e.toString()}');
+      _setError(e.toString());
       return false;
     } finally {
       _setLoading(false);
@@ -196,9 +209,5 @@ class AuthProvider extends ChangeNotifier {
   void _clearError() {
     _errorMessage = null;
     notifyListeners();
-  }
-
-  void clearError() {
-    _clearError();
   }
 }

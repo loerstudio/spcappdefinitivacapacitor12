@@ -43,10 +43,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final success = await authProvider.register(
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        name: _nameController.text.trim(),
-        surname: _surnameController.text.trim().isEmpty ? null : _surnameController.text.trim(),
-        phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-        role: _selectedRole,
+        firstName: _nameController.text.trim(),
+        lastName: _surnameController.text.trim(),
+        isTrainer: _selectedRole == UserRole.trainer,
       );
 
       if (success && mounted) {

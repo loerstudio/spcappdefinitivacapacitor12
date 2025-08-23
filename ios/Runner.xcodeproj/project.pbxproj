@@ -256,7 +256,9 @@
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
-		};
+		
+				A1234567890123456789 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+};
 		97C146EC1CF9000F007C117D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;

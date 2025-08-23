@@ -27,13 +27,13 @@ dependencies:
   http: ^1.2.0
   dio: ^5.4.0
   
+  
   # Local Storage
   shared_preferences: ^2.2.2
   sqflite: ^2.3.0
   
-  # Authentication
-  # firebase_core: ^2.24.2
-  # firebase_auth: ^4.15.3
+  # Authentication & Database
+  supabase_flutter: ^2.6.0
   
   # Image & Media
   image_picker: ^1.0.7
