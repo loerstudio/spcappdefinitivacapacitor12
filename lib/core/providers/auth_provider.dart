@@ -162,6 +162,36 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // OAuth sign-in helpers
+  Future<bool> signInWithGoogle() async {
+    _setLoading(true);
+    _clearError();
+    try {
+      await _supabaseService.signInWithGoogle();
+      // Flow continues via deep link and auth state listener
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> signInWithGithub() async {
+    _setLoading(true);
+    _clearError();
+    try {
+      await _supabaseService.signInWithGithub();
+      return true;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // Alias for logout method
   Future<void> logout() async {
     return await signOut();
