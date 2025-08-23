@@ -71,6 +71,31 @@ class SupabaseService {
     }
   }
 
+  // OAuth: generic method
+  Future<AuthResponse> signInWithOAuth(Provider provider) async {
+    try {
+      final response = await auth.signInWithOAuth(
+        provider,
+        redirectTo: 'io.supabase.flutter://login-callback',
+      );
+      return response;
+    } on AuthException catch (e) {
+      throw Exception(_handleAuthException(e));
+    } catch (e) {
+      throw Exception('OAuth sign-in failed: $e');
+    }
+  }
+
+  // OAuth: Google
+  Future<AuthResponse> signInWithGoogle() async {
+    return signInWithOAuth(Provider.google);
+  }
+
+  // OAuth: GitHub
+  Future<AuthResponse> signInWithGithub() async {
+    return signInWithOAuth(Provider.github);
+  }
+
   // Sign out
   Future<void> signOut() async {
     try {

@@ -46,6 +46,32 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _handleGoogle() async {
+    final authProvider = context.read<AuthProvider>();
+    final ok = await authProvider.signInWithGoogle();
+    if (!ok && mounted && authProvider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage!),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleGithub() async {
+    final authProvider = context.read<AuthProvider>();
+    final ok = await authProvider.signInWithGithub();
+    if (!ok && mounted && authProvider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage!),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -183,30 +209,71 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Login Button
                 Consumer<AuthProvider>(
                   builder: (context, authProvider, child) {
-                    return SizedBox(
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: authProvider.isLoading ? null : _handleLogin,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryRed,
-                          foregroundColor: AppColors.primaryWhite,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: authProvider.isLoading ? null : _handleLogin,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryRed,
+                              foregroundColor: AppColors.primaryWhite,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: authProvider.isLoading
+                                ? const CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryWhite),
+                                  )
+                                : Text(
+                                    'ACCEDI',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      color: AppColors.primaryWhite,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
                           ),
                         ),
-                        child: authProvider.isLoading
-                            ? const CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryWhite),
-                              )
-                            : Text(
-                                'ACCEDI',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: AppColors.primaryWhite,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1,
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: authProvider.isLoading ? null : _handleGoogle,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primaryWhite,
+                                  side: const BorderSide(color: AppColors.lightGrey),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
+                                icon: const Icon(Icons.g_mobiledata, color: AppColors.primaryWhite, size: 28),
+                                label: const Text('Google'),
                               ),
-                      ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: authProvider.isLoading ? null : _handleGithub,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primaryWhite,
+                                  side: const BorderSide(color: AppColors.lightGrey),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.code, color: AppColors.primaryWhite, size: 22),
+                                label: const Text('GitHub'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     );
                   },
                 ),
